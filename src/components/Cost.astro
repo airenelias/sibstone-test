@@ -1,0 +1,140 @@
+---
+import CostSheet from "./CostSheet.astro";
+import CostResult from "./CostResult.astro";
+---
+
+<style>
+    .modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+    .modal.hidden {
+        display: none;
+    }
+    .modal-panel {
+        width: 90vh;
+        height: 90vh;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    .close-row {
+        display: flex;
+        justify-content: flex-end;
+        padding: 10px;
+    }
+    .cost-panel {
+        overflow: auto;
+    }
+</style>
+
+<div id="cost-modal" class="modal hidden">
+    <article class="modal-panel">
+        <div class="close-row">
+            <button id="cost-close">Закрыть</button>
+        </div>
+
+        <div class="cost-panel">
+            <h2>Расчет стоимости</h2>
+            <h3>Раскрой</h3>
+            <div id="sheet-list">
+                <template id="sheet-template">
+                    <CostSheet />
+                </template>
+                <div id="sheet-data"></div>
+            </div>
+
+            <!-- TODO cost details -->
+            <h3>Стоимость</h3>
+            <div id="cost-list">
+                <CostResult />
+            </div>
+        </div>
+    </article>
+</div>
+
+<script>
+    import type { Rectangle } from "../types/rectangle";
+
+    let lastPacking: any = null;
+    let materialName: string;
+    let materialThickness: number;
+    let materialCost: number;
+
+    const modal = document.querySelector<HTMLDivElement>("#cost-modal")!;
+    const sheetList = modal.querySelector<HTMLDivElement>("#sheet-list")!;
+    const template = sheetList.querySelector<HTMLTemplateElement>("#sheet-template")!;
+    const sheetData = sheetList.querySelector<HTMLDivElement>("#sheet-data")!;
+    const costList = modal.querySelector<HTMLDivElement>("#cost-list")!;
+
+    // close on click outside of the panel
+    modal.addEventListener("click", (e) => {
+        const panel = modal.querySelector<HTMLDivElement>(".cost-panel")!;
+        if (!panel.contains(e.target as Node)) {
+            modal.classList.add("hidden");
+        }
+    });
+
+    window.addEventListener("packing-done", (e) => {
+        const event = e as CustomEvent;
+        lastPacking = event.detail.result;
+        materialName = event.detail.name;
+        materialThickness = event.detail.thickness;
+        materialCost = event.detail.cost;
+    });
+
+    document.addEventListener("open-cost-modal", () => {
+        if (!lastPacking) return;
+
+        sheetData.innerHTML = "";
+
+        let totalArea = 0;
+
+        lastPacking.bins.forEach((bin: any, index: any) => {
+            const clone = template.content.cloneNode(true) as DocumentFragment;
+            const root = clone.querySelector<HTMLDivElement>(".sheet")!;
+
+            const sheetIndex = root.querySelector<HTMLSpanElement>(".sheet-index")!;
+            const sheetLength = root.querySelector<HTMLSpanElement>(".sheet-length")!;
+            const sheetWidth = root.querySelector<HTMLSpanElement>(".sheet-width")!;
+            const detailCount = root.querySelector<HTMLSpanElement>(".detail-count")!;
+            sheetIndex.textContent = `${index + 1}`;
+            sheetLength.textContent = bin.height;
+            sheetWidth.textContent = bin.width;
+            detailCount.textContent = bin.used.length;
+
+            const sheetArea = bin.width * bin.height;
+            const usedArea = bin.used.reduce((sum: number, r: Rectangle) => sum + r.width * r.height, 0);
+            const wasteArea = sheetArea - usedArea;
+
+            totalArea += sheetArea / 1000000;
+
+            const usedM2 = usedArea / 1000000;
+            const wasteM2 = wasteArea / 1000000;
+
+            const detailUsefulArea = root.querySelector<HTMLSpanElement>(".detail-useful-area")!;
+            const detailUselessArea = root.querySelector<HTMLSpanElement>(".detail-useless-area")!;
+            const detailAreaPercent = root.querySelector<HTMLSpanElement>(".detail-area-percent")!;
+            detailUsefulArea.textContent = usedM2.toFixed(2);
+            detailUselessArea.textContent = wasteM2.toFixed(2);
+            detailAreaPercent.textContent = ((usedArea / sheetArea) * 100).toFixed(1);
+
+            sheetData.appendChild(clone);
+        });
+
+        const totalCost = totalArea * materialCost;
+
+        const costMaterialName = costList.querySelector<HTMLSpanElement>(".cost-material-name")!;
+        const costMaterial = costList.querySelector<HTMLSpanElement>(".cost-material")!;
+        const costResult = costList.querySelector<HTMLSpanElement>(".cost-result")!;
+        costResult.textContent = totalCost.toFixed(2);
+        costMaterialName.textContent = materialName;
+        costMaterial.textContent = materialCost.toFixed(2);
+
+        modal.classList.remove("hidden");
+    });
+</script>

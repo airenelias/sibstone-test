@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <link rel="stylesheet" href="pico.min.css" />
+        <meta name="generator" content={Astro.generator} />
+        <title>SibStounCut</title>
+    </head>
+
+    <body>
+        <main class="page">
+            <slot />
+        </main>
+    </body>
+
+    <style>
+        body {
+            background-image: url("background.svg");
+            background-size: cover;
+            background-repeat: no-repeat;
+            background-position: center;
+        }
+        .page {
+            height: 100vh;
+            overflow: hidden;
+        }
+    </style>
+
+    <style is:global>
+        :root {
+            --detail-card-background-color: #d0d4e0;
+        }
+        [data-theme="dark"] {
+            --detail-card-background-color: #1e2330;
+        }
+    </style>
+</html>

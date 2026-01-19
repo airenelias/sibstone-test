@@ -1,0 +1,101 @@
+---
+import Calculator from "../components/Calculator.astro";
+import Canvas from "../components/Canvas.astro";
+import Cost from "../components/Cost.astro";
+import Layout from "../layouts/Layout.astro";
+---
+
+<style>
+    .layout-root {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .header-row {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+    }
+    .content-row {
+        display: flex;
+        flex: 1;
+        overflow: hidden;
+    }
+    .panel {
+        flex: 1;
+        padding: 5px;
+    }
+    /* scrollable narrow calculator on left */
+    .calculator-panel {
+        max-width: 400px;
+        overflow: auto;
+    }
+    /* scrollable canvas on right */
+    .canvas-panel {
+        overflow: auto;
+    }
+</style>
+
+<Layout>
+    <div class="layout-root">
+        <div class="header-row" style="gap:20px">
+            <h1 style="margin: 0; padding-left: 20px;">SibStounCut</h1>
+            <button id="theme-button">Тема</button>
+            <button id="cost-button" disabled="true">Расчет стоимости</button>
+        </div>
+
+        <div class="content-row">
+            <div class="panel calculator-panel">
+                <Calculator />
+            </div>
+
+            <div class="panel canvas-panel">
+                <Canvas />
+            </div>
+        </div>
+    </div>
+
+    <Cost id="cost-modal" />
+</Layout>
+
+<script>
+    // dark/light theme init
+    let currentTheme = localStorage.getItem("theme");
+    if (!currentTheme) {
+        const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        currentTheme = prefersDark ? "dark" : "light";
+    }
+
+    document.documentElement.setAttribute("data-theme", currentTheme);
+
+    // dark/light theme switch
+    const themeBtn = document.querySelector<HTMLButtonElement>("#theme-button")!;
+    themeBtn.addEventListener("click", () => {
+        currentTheme = currentTheme === "dark" ? "light" : "dark";
+        document.documentElement.setAttribute("data-theme", currentTheme);
+        localStorage.setItem("theme", currentTheme);
+    });
+
+    // enable result button on cut complete
+    const costBtn = document.querySelector<HTMLButtonElement>("#cost-button")!;
+    window.addEventListener("packing-done", () => {
+        costBtn.disabled = false;
+    });
+    // result button modal window
+    costBtn.addEventListener("click", () => {
+        const modal = document.querySelector<HTMLDivElement>("#cost-modal")!;
+        modal.classList.remove("hidden");
+        modal.dispatchEvent(new Event("show"));
+    });
+
+    costBtn.addEventListener("click", () => {
+        document.dispatchEvent(new Event("open-cost-modal"));
+    });
+
+    const closeBtn = document.querySelector<HTMLButtonElement>("#cost-close")!;
+    closeBtn.addEventListener("click", () => {
+        const modal = document.querySelector<HTMLDivElement>("#cost-modal")!;
+        modal.classList.add("hidden");
+    });
+</script>

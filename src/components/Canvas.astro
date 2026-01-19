@@ -1,0 +1,38 @@
+---
+
+---
+
+<style>
+    canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
+    }
+</style>
+
+<article>
+    <canvas id="canvas"></canvas>
+</article>
+
+<script>
+    import { drawResult } from "../scripts/Canvas";
+
+    const canvas = document.querySelector<HTMLCanvasElement>("#canvas")!;
+    const ctx = canvas.getContext("2d")!;
+
+    window.addEventListener("packing-done", (e) => {
+        const event = e as CustomEvent;
+        const result = event.detail.result;
+
+        resizeCanvasToDisplaySize(canvas);
+        drawResult(ctx, canvas, result);
+    });
+
+    function resizeCanvasToDisplaySize(canvas: any) {
+        const rect = canvas.parentElement!.getBoundingClientRect();
+        const width = Math.floor(rect.width);
+        if (canvas.width !== width) {
+            canvas.width = width;
+        }
+    }
+</script>

@@ -1,0 +1,225 @@
+---
+import { materials } from "../data/materials";
+import Detail from "../components/Detail.astro";
+---
+
+<style>
+    .calculator-container {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+    }
+    /* scrollable details */
+    .details-panel {
+        overflow-y: auto;
+    }
+</style>
+
+<div class="calculator-container">
+    <article style="display: flex; flex-direction: column;">
+        <h2>Материал</h2>
+        <select id="material-select" required>
+            <option selected disabled value="">Выберите материал</option>
+            {
+                materials.map((material) => (
+                    <option value={material.id}>
+                        {`${material.name} (${material.length}x${material.width}x${material.thickness})`}
+                    </option>
+                ))
+            }
+        </select>
+        <button id="calculate" disabled>Рассчитать раскрой</button>
+        <small
+            id="valid-helper"
+            style="padding-top: 5px;
+                user-select: none;
+                color: var(--pico-form-element-invalid-border-color);"
+        ></small>
+    </article>
+
+    <article class="details-panel">
+        <h2>Детали</h2>
+        <div id="details-list">
+            <template id="detail-template">
+                <Detail />
+            </template>
+        </div>
+        <button id="detail-add">Добавить деталь</button>
+    </article>
+</div>
+
+<script>
+    import type { Detail as DetailType } from "../types/detail";
+    import type { Material } from "../types/material";
+    import { materials } from "../data/materials";
+    import { packDetailsNew } from "../scripts/Maxrects.js";
+
+    const materialSelect = document.querySelector<HTMLSelectElement>("#material-select")!;
+    const calculateButton = document.querySelector<HTMLButtonElement>("#calculate")!;
+    const validHelper = document.querySelector<HTMLElement>("#valid-helper")!;
+    const detailsList = document.querySelector<HTMLDivElement>("#details-list")!;
+    const detailAddButton = document.querySelector<HTMLButtonElement>("#detail-add")!;
+    const detailTemplate = document.querySelector<HTMLTemplateElement>("#detail-template")!;
+    const costButton = document.querySelector<HTMLButtonElement>("#cost")!;
+
+    let detailCounter = 1;
+
+    const detailsIsValid = () => {
+        let detailsCount = 0;
+        let invalidSize = false;
+
+        const details = detailsList.querySelectorAll<HTMLElement>(".detail");
+        details.forEach((detail) => {
+            const widthInput = detail.querySelector<HTMLInputElement>('input[name="width"]')!;
+            const heightInput = detail.querySelector<HTMLInputElement>('input[name="length"]')!;
+
+            if (widthInput.value === "") {
+                widthInput.ariaInvalid = "true";
+                invalidSize = true;
+            } else {
+                widthInput.ariaInvalid = "";
+            }
+            if (heightInput.value === "") {
+                heightInput.ariaInvalid = "true";
+                invalidSize = true;
+            } else {
+                heightInput.ariaInvalid = "";
+            }
+
+            detailsCount++;
+        });
+
+        validHelper.textContent = "";
+        calculateButton.disabled = false;
+
+        if (materialSelect.value === "") {
+            validHelper.textContent = "Выберите материал";
+            calculateButton.disabled = true;
+            return false;
+        }
+
+        if (detailsCount === 0) {
+            validHelper.textContent = "Добавьте хотя бы одну деталь";
+            calculateButton.disabled = true;
+            return false;
+        }
+
+        if (invalidSize) {
+            validHelper.textContent = "Заполните размеры всех деталей";
+            calculateButton.disabled = true;
+            return false;
+        }
+
+        return true;
+    };
+
+    detailAddButton.addEventListener("click", () => {
+        const clone = detailTemplate.content.cloneNode(true) as HTMLElement;
+        const nameInput = clone.querySelector<HTMLInputElement>('input[name="name"]')!;
+        const quantityInput = clone.querySelector<HTMLInputElement>('input[name="quantity"]')!;
+        nameInput.value = `Деталь ${detailCounter}`;
+        quantityInput.value = "1";
+        detailsList.appendChild(clone);
+        detailCounter++;
+    });
+
+    detailsList.addEventListener("click", (event) => {
+        const target = event.target as HTMLElement;
+        if (target.id === "detail-delete") {
+            const article = target.closest("article");
+            if (article) article.remove();
+        }
+    });
+
+    const collectDetailsIntoArray = () => {
+        const details = detailsList.querySelectorAll<HTMLElement>(".detail");
+        const detailsArray: DetailType[] = [];
+        details.forEach((detail) => {
+            const name = detail.querySelector<HTMLInputElement>('input[name="name"]')!.value;
+            const width = Number(detail.querySelector<HTMLInputElement>('input[name="width"]')!.value);
+            const length = Number(detail.querySelector<HTMLInputElement>('input[name="length"]')!.value);
+            const quantity = Number(detail.querySelector<HTMLInputElement>('input[name="quantity"]')!.value);
+
+            const detailObject: DetailType = { name, width, length, quantity };
+            detailsArray.push(detailObject);
+        });
+        return detailsArray;
+    };
+
+    const saveDetails = () => {
+        const details = collectDetailsIntoArray();
+        localStorage.setItem("details", JSON.stringify(details));
+    };
+
+    const loadDetails = () => {
+        const saved = localStorage.getItem("details");
+        if (!saved) return;
+
+        const details: DetailType[] = JSON.parse(saved);
+
+        details.forEach((detail) => {
+            const clone = detailTemplate.content.cloneNode(true) as HTMLElement;
+            clone.querySelector<HTMLInputElement>('input[name="name"]')!.value = detail.name;
+            // replace zeros to empty strings for nice input looks
+            const width = detail.width === 0 ? "" : String(detail.width);
+            const length = detail.length === 0 ? "" : String(detail.length);
+            clone.querySelector<HTMLInputElement>('input[name="width"]')!.value = width;
+            clone.querySelector<HTMLInputElement>('input[name="length"]')!.value = length;
+            clone.querySelector<HTMLInputElement>('input[name="quantity"]')!.value = String(detail.quantity);
+            detailsList.appendChild(clone);
+        });
+
+        detailCounter = details.length + 1;
+    };
+
+    const getSelectedMaterial = (): Material | undefined => {
+        const id = Number(materialSelect.value);
+        return materials.find((m) => m.id === id);
+    };
+
+    calculateButton.addEventListener("click", () => {
+        const material = getSelectedMaterial();
+        if (!material) {
+            console.error("No material selected");
+            return;
+        }
+
+        const result = packDetailsNew(
+            collectDetailsIntoArray(),
+            material.width,
+            material.length,
+            material.widthStep,
+            material.lengthStep,
+        );
+
+        window.dispatchEvent(
+            new CustomEvent("packing-done", {
+                detail: {
+                    result,
+                    name: material.name,
+                    thickness: material.thickness,
+                    cost: material.cost,
+                },
+            }),
+        );
+    });
+
+    materialSelect.addEventListener("change", detailsIsValid);
+
+    window.addEventListener("DOMContentLoaded", () => {
+        costButton.disabled = true;
+    });
+    materialSelect.addEventListener("change", () => {
+        costButton.disabled = true;
+    });
+
+    detailsList.addEventListener("input", detailsIsValid);
+    detailsList.addEventListener("input", saveDetails);
+    detailsList.addEventListener("click", detailsIsValid);
+    detailsList.addEventListener("click", saveDetails);
+    detailAddButton.addEventListener("click", detailsIsValid);
+    detailAddButton.addEventListener("click", saveDetails);
+
+    loadDetails();
+    detailsIsValid();
+</script>
